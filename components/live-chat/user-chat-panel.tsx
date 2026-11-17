@@ -264,6 +264,7 @@ export function UserChatPanel({ chatId, onClose, onEnded, onMinimize, externalCa
       return
     }
     if (result.blocked) window.dispatchEvent(new CustomEvent('lc-blocked'))
+    if (result.sessionExpired) window.dispatchEvent(new CustomEvent('lc-session-expired'))
     entry.retryable = result.retryable
     syncMessages(map => {
       const cur = map.get(clientId)
@@ -293,6 +294,8 @@ export function UserChatPanel({ chatId, onClose, onEnded, onMinimize, externalCa
     const load = async () => {
       try {
         const res = await fetch(`/api/live-chat?chatId=${encodeURIComponent(chatId)}`)
+        // Login session ended: stop pretending the chat works and let the widget recover.
+        if (res.status === 401 && !stop) { window.dispatchEvent(new CustomEvent('lc-session-expired')); return }
         if (res.ok && !stop) {
           const data = await res.json()
           const hidden = data.historyHidden?.hidden ? { hidden: true, hiddenAt: Number(data.historyHidden.hiddenAt) || null } : { hidden: false, hiddenAt: null }
