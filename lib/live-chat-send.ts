@@ -31,8 +31,10 @@ export interface SendResult {
   retryable: boolean
   /** The device/chat is blocked by the reply timer. */
   blocked?: boolean
+  /** The visitor's login session ended — they must sign in again (retrying can't help). */
+  sessionExpired?: boolean
   /** Why it failed, for logs only — never shown to visitors verbatim. */
-  reason?: 'offline' | 'timeout' | 'network' | 'server' | 'rejected' | 'bad-response'
+  reason?: 'offline' | 'timeout' | 'network' | 'server' | 'rejected' | 'bad-response' | 'session-expired'
   attempts: number
 }
 
@@ -97,7 +99,7 @@ export async function sendWithRetry(payload: Record<string, unknown>, opts: Send
       }
 
       const retryable = isRetryableStatus(res.status)
-      last = { ok: false, status: res.status, retryable, blocked: !!data?.blocked, reason: retryable ? 'server' : 'rejected' }
+      last = { ok: false, status: res.status, retryable, blocked: !!data?.blocked, sessionExpired: data?.code === 'session_expired', reason: data?.code === 'session_expired' ? 'session-expired' : retryable ? 'server' : 'rejected' }
       if (!retryable) return { ...last, attempts }
     } catch (err: any) {
       last = { ok: false, retryable: true, reason: err?.name === 'AbortError' ? 'timeout' : 'network' }
