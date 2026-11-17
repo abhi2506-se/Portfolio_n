@@ -47,6 +47,8 @@ describe('sendWithRetry – idempotent message submission', () => {
     }
     const blocked = await sendWithRetry(payload, opts(() => json(403, { blocked: true })))
     expect(blocked.blocked).toBe(true)
+    const expired = await sendWithRetry(payload, opts(() => json(401, { code: 'session_expired' })))
+    expect(expired).toMatchObject({ ok: false, retryable: false, sessionExpired: true, reason: 'session-expired', attempts: 1 })
   })
 
   it('retries 429 and 5xx, and reports a retryable failure when every attempt fails', async () => {
