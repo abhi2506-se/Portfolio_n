@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/admin-auth'
 import { CO_ADMIN_SESSION_COOKIE, verifyCoAdminToken } from '@/lib/co-admin-auth'
 import { getOrCreateDeviceId, attachDeviceCookie } from '@/lib/device-id'
-import { heartbeat, getPresence, isChatSecured, isChatLockedForDevice } from '@/lib/live-chat-db'
+import { heartbeat, getPresence, isChatLockedForDevice } from '@/lib/live-chat-db'
 import { isRealAdminRequest } from '@/lib/live-chat-auth'
 
 // What a visitor sees for the admin on an Extra Security chat they have not unlocked.
 const HIDDEN_ADMIN = { status: 'offline' as const, awaySeconds: 0, lastActiveAt: null, hidden: true }
-import { broadcastToChat } from '@/lib/supabase-realtime'
+
 
 const SESSION_COOKIE = 'portfolio_admin_session'
 
@@ -43,12 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, presence: await getPresence(chatId) })
     }
     const presence = await heartbeat(chatId, role, !!active)
-    // Admin presence is not broadcast on Extra Security chats: a visitor on the
-    // channel would see it without entering the password.
-    const secured = await isChatSecured(chatId)
-    if (!(role === 'admin' && secured)) {
-      broadcastToChat(chatId, 'presence', { role, ...presence[role] }).catch(() => {})
-    }
+    
     // The heartbeat response includes admin presence, so hide it from a locked visitor too.
     const locked = !admin && await isChatLockedForDevice(chatId, deviceId)
     const outPresence = locked ? { ...presence, admin: HIDDEN_ADMIN } : presence
