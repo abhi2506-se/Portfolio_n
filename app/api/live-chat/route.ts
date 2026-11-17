@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { notifyChatVisitor } from '@/lib/live-chat-notify'
-import { getVisitorForChat, ownsChat } from '@/lib/live-chat-identity'
+import { getVisitorForChat, ownsChat, chatAccessDenied } from '@/lib/live-chat-identity'
 import { lazySql as sql } from '@/lib/neon-lazy'
 import nodemailer from 'nodemailer'
 import { verifyToken } from '@/lib/admin-auth'
@@ -243,7 +243,8 @@ export async function POST(req: NextRequest) {
       const chatRow = (await sql`SELECT device_id, visitor_id, user_name, status, ai_active FROM live_chats WHERE id = ${chatId}`)[0]
       if (!chatRow) return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
       if (!ownsChat(chatRow, deviceId, visitorId)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        const d = chatAccessDenied(chatRow, visitorId)
+        return NextResponse.json({ error: d.error, code: d.code }, { status: d.status })
       }
       if (chatRow.status === 'closed') return NextResponse.json({ error: 'Chat has ended' }, { status: 409 })
 
@@ -936,7 +937,8 @@ export async function GET(req: NextRequest) {
       const { deviceId, isNew, token } = getOrCreateDeviceId(req)
       const ownerRow = (await sql`SELECT device_id, visitor_id FROM live_chats WHERE id = ${chatId}`)[0]
       if (!ownsChat(ownerRow, deviceId, visitorId)) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        const d = chatAccessDenied(ownerRow, visitorId)
+        return NextResponse.json({ error: d.error, code: d.code }, { status: d.status })
       }
       // Reply timer: if the visitor has missed their reply, block now. This runs
       // on every poll, so the block takes effect within a few seconds.
