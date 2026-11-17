@@ -539,10 +539,25 @@ export function AIAssistant() {
       setShowLiveChat(true)
       setOpen(true)
     }
+    // The visitor's login session ended while a chat was open. Drop the dead thread and say why,
+    // instead of leaving messages stuck on "Send again". After they sign in again, the whoami
+    // check re-attaches their previous conversation automatically.
+    const onSessionExpired = () => {
+      setLiveChatId(null)
+      setLiveChatMessages([])
+      setLiveChatStatus('pending')
+      setChatIdentity(null)
+      setPreChatDone(false)
+      setLiveChatFullscreen(false)
+      setLiveChatStartError('Your sign-in session expired. Please sign in again to continue your previous chat.')
+      try { localStorage.removeItem('lc_owner') } catch {}
+    }
+    window.addEventListener('lc-session-expired', onSessionExpired)
     window.addEventListener('lc-blocked', onBlocked)
     window.addEventListener('lc-open-ai', onOpenAi)
     window.addEventListener('lc-unblocked', onUnblocked)
     return () => {
+      window.removeEventListener('lc-session-expired', onSessionExpired)
       window.removeEventListener('lc-blocked', onBlocked)
       window.removeEventListener('lc-open-ai', onOpenAi)
       window.removeEventListener('lc-unblocked', onUnblocked)
