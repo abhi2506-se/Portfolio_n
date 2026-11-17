@@ -119,3 +119,24 @@ describe('live chat identity', () => {
     await flush()
   })
 })
+
+describe('expired login session (the daily "Send again" bug)', () => {
+  it('message POST and chat GET answer 401 session_expired — not an opaque 403 — so the widget can recover', async () => {
+    h.visitor = ASHA
+    const { chatId } = await (await post({ action: 'start', sessionId: 's1', initialMessage: 'x' })).json()
+    h.visitor = null                                         // session idled out / expired overnight
+    const w = await post({ action: 'message', chatId, clientId: 'c_exp', content: 'hi' })
+    expect(w.status).toBe(401)
+    expect((await w.json()).code).toBe('session_expired')
+    const rd = await get(`chatId=${chatId}`)
+    expect(rd.status).toBe(401)
+    expect((await rd.json()).code).toBe('session_expired')
+    await flush()
+  })
+  it('a guest chat owned by another device stays a plain 403', async () => {
+    const { chatId } = await (await post({ action: 'start', sessionId: 'g1', userName: 'Guest', userEmail: 'guest@example.com', userPhone: '+919999999999', initialMessage: 'yo' }, 'devGUEST3456789abcdef0123456789ab')).json()
+    const w = await post({ action: 'message', chatId, clientId: 'c_g', content: 'hi' }, 'devOTHER23456789abcdef0123456789a')
+    expect(w.status).toBe(403)
+    await flush()
+  })
+})
